@@ -8,6 +8,7 @@
 
 import UIKit
 import CoreData
+import UserNotifications
 
 class MyNotesTableViewController: UITableViewController {
 
@@ -65,19 +66,42 @@ class MyNotesTableViewController: UITableViewController {
            tableView.reloadData()
        }
     
+    func shoppingListDoneNotification () {
+    
+    var done = true
+    
+    // loop through MyNotes items
+    for item in MyNotes{
+        // check if any of the purchased attributes are false
+        if item.isDeleted == false {
+            // set done to false
+            done = false
+        }
+    }
+    
+    // check if done is true
+    if (done == true) {
+        
+        // create content object that controls the content and sound of the notification
+        let content = UNMutableNotificationContent()
+        content.title = "MyNotes"
+        content.body = "All Notes Deleted!"
+        content.sound = UNNotificationSound.default
+        
+        // create request object that defines when the notification will be sent and if it should be sent repeatidly
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        
+        let request = UNNotificationRequest(identifier: "MyNotesIdentifier", content: content, trigger: trigger)
+        
+        UNUserNotificationCenter.current().add(request, withCompletionHandler: nil)
+        }
+    }
     
     @IBAction func addButtonPressed(_ sender: UIBarButtonItem) {
         
         // declare Text Fields variables for the input of the title, type, and date
         var titleTextfeild = UITextField()
         var typeTextfeild = UITextField()
-        var dateTextfeild = UITextField()
-        
-        let date = Date()
-        let format = DateFormatter()
-        format.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        let formattedDate = format.string(from: date)
-        print(formattedDate)
         
         // create an Alert Controller
         let alert = UIAlertController(title: "Add Notes", message: "", preferredStyle: .alert)
@@ -87,11 +111,18 @@ class MyNotesTableViewController: UITableViewController {
                                  
         // create an instance of a ShoppingList entity
         let newNotes = Notes(context: self.context)
+            
+            // generating the current date
+            let date = Date()
+            let format = DateFormatter()
+            format.dateFormat = "yyyy-MM-dd HH:mm:ss"
+            let formattedDate = format.string(from: date)
+            print(formattedDate)
                                  
        // get name, store, and date input by user and store them in the ShoppingList entity
             newNotes.title = titleTextfeild.text!
             newNotes.type = typeTextfeild.text!
-            newNotes.date = dateTextfeild.text!
+            newNotes.date = formattedDate
            
         // add ShoppingListItem entity into array
         self.MyNotes.append(newNotes)
@@ -124,12 +155,7 @@ class MyNotesTableViewController: UITableViewController {
                                  typeTextfeild.placeholder = "Type"
                                  typeTextfeild.addTarget(self, action: #selector((self.alertTextFieldDidChange)), for: .editingChanged)
                              })
-                             alert.addTextField(configurationHandler: { (field) in
-                                 dateTextfeild = field
-                                 dateTextfeild.placeholder = "Date"
-                                 dateTextfeild.addTarget(self, action: #selector((self.alertTextFieldDidChange)), for: .editingChanged)
-                             })
-        
+                             
                              
                              // display the Alert Controller
                              present(alert, animated: true, completion: nil)
@@ -146,17 +172,16 @@ class MyNotesTableViewController: UITableViewController {
                
                // get refernce to the text in the Text Fields
                if let title = alertController.textFields![0].text,
-                   let type = alertController.textFields![1].text,
-                let date = alertController.textFields![2].text{
+                   let type = alertController.textFields![1].text{
                    
                    // trim whitespaces from the text
                    let trimmedTitle = title.trimmingCharacters(in: .whitespaces)
                    let trimmedType = type.trimmingCharacters(in: .whitespaces)
-                   let trimmedDate = date.trimmingCharacters(in: .whitespaces)
+                   
                    
                    
                    //check if the trimmed text isn't empty and if it isn't enable the action that allows the user to add ShoppingList
-                   if (!trimmedTitle.isEmpty && !trimmedType.isEmpty && !trimmedDate.isEmpty ){
+                   if (!trimmedTitle.isEmpty && !trimmedType.isEmpty){
                        action.isEnabled = true
                    }
            }
@@ -185,19 +210,66 @@ class MyNotesTableViewController: UITableViewController {
               cell.detailTextLabel?.text = MyNote.type! + " " +
               MyNote.date!
 
-
-
         return cell
     }
     
-
-    /*
+    // Override to support editing the table view.
+    override func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
+        if editingStyle == .delete {
+             // Delete the row from the data source
+            let item = MyNotes[indexPath.row]
+            deleteMyNotes(item: item)
+                      
+        }
+    }
+    
     // Override to support conditional editing of the table view.
     override func tableView(_ tableView: UITableView, canEditRowAt indexPath: IndexPath) -> Bool {
         // Return false if you do not want the specified item to be editable.
         return true
     }
-    */
+
+    override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        let cell = tableView.dequeueReusableCell(withIdentifier: "MyNotesCell", for: indexPath)
+
+        // getting the selected shopping list item
+        let MyNote = MyNotes[indexPath.row]
+        
+        if (isDeleted == true){
+            // if purchased indicator is true, set it to false and remove checkmark
+            cell.accessoryType = .none
+            MyNotes.isDeleted = false
+        } else {
+            // if purchased indicator is false, set it to true and remove checkmark
+          cell.accessoryType = .checkmark
+            MyNotes.isDeleted = true
+        }
+        
+        //configure the table view cell
+        cell.textLabel?.text = MyNotes.name
+        cell.detailTextLabel!.numberOfLines = 0
+        cell.detailTextLabel?.text = sQuantity + "\n" + sPrice
+        
+        //save update to purchased indicator
+        self.saveMyNotes()
+        
+        //call deselect Row method to allow update to be visinle in table view controller
+        tableView.deselectRow(at: indexPath, animated: true)
+        
+        MyNotesDoneNotification()
+    }
+
+    // Override to support editing the table view.
+    override func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
+        
+        if editingStyle == .delete {
+            // Delete the row from the data source
+            let item = MyNotes[indexPath.row]
+            deleteMyNotes(item: item)
+    
+        }
+    }
+    
 
     /*
     // Override to support editing the table view.
@@ -238,3 +310,4 @@ class MyNotesTableViewController: UITableViewController {
 
 
 }
+ 
